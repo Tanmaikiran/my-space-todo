@@ -20,9 +20,7 @@ const razorpayInstance = new Razorpay({
 });
 
 const mongoURI = "mongodb+srv://admin:Tannu%402006@cluster0.0cpngfx.mongodb.net/?appName=Cluster0";
-mongoose.connect(mongoURI)
-    .then(() => console.log("MongoDB Connected"))
-    .catch(err => console.error(err));
+mongoose.connect(mongoURI).then(() => console.log("DB Connected"));
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
@@ -34,104 +32,56 @@ app.use(session({
     saveUninitialized: true
 }));
 
-const userSchema = new mongoose.Schema({
+const User = mongoose.model('User', new mongoose.Schema({
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     isPremium: { type: Boolean, default: false }
-});
-const User = mongoose.model('User', userSchema);
+}));
 
-const todoSchema = new mongoose.Schema({
+const Todo = mongoose.model('Todo', new mongoose.Schema({
     text: String,
     isCompleted: { type: Boolean, default: false },
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
-});
-const Todo = mongoose.model('Todo', todoSchema);
+}));
 
 app.get('/', (req, res) => res.render('login'));
 app.get('/signup', (req, res) => res.render('signup'));
-
 app.post('/signup', async (req, res) => {
     const { email, password } = req.body;
-    try {
-        const existingUser = await User.findOne({ email });
-        if (existingUser) return res.send("User exists. <a href='/'>Login</a>");
-        const otp = Math.floor(1000 + Math.random() * 9000).toString();
-        req.session.tempUser = { email, password, otp };
-        await transporter.sendMail({
-            from: 'tanmaibattu@gmail.com',
-            to: email,
-            subject: 'Verification Code',
-            text: `Your OTP is: ${otp}`
-        });
-        res.redirect('/verify');
-    } catch (err) {
-        res.send("Signup Error.");
-    }
+    const otp = Math.floor(1000 + Math.random() * 9000).toString();
+    req.session.tempUser = { email, password, otp };
+    await transporter.sendMail({ from: 'tanmaibattu@gmail.com', to: email, subject: 'OTP', text: `OTP: ${otp}` });
+    res.redirect('/verify');
 });
-
-app.get('/verify', (req, res) => {
-    if (!req.session.tempUser) return res.redirect('/signup');
-    res.render('verify', { email: req.session.tempUser.email });
-});
-
+app.get('/verify', (req, res) => res.render('verify', { email: req.session.tempUser.email }));
 app.post('/verify', async (req, res) => {
-    const { otp } = req.body;
-    const tempUser = req.session.tempUser;
-    if (tempUser && otp === tempUser.otp) {
-        const newUser = new User({ email: tempUser.email, password: tempUser.password });
-        await newUser.save();
-        req.session.userId = newUser._id;
-        req.session.tempUser = null;
-        res.redirect('/app');
-    } else {
-        res.send("Invalid OTP.");
-    }
+    const newUser = new User({ email: req.session.tempUser.email, password: req.session.tempUser.password });
+    await newUser.save();
+    req.session.userId = newUser._id;
+    res.redirect('/app');
 });
-
 app.post('/login', async (req, res) => {
-    const { email, password } = req.body;
-    const foundUser = await User.findOne({ email });
-    if (foundUser && foundUser.password === password) {
-        req.session.userId = foundUser._id;
-        res.redirect('/app');
-    } else {
-        res.send("Invalid credentials.");
-    }
+    const user = await User.findOne({ email: req.body.email });
+    if (user && user.password === req.body.password) { req.session.userId = user._id; res.redirect('/app'); }
 });
 
 app.get('/app', async (req, res) => {
-    if (!req.session.userId) return res.redirect('/');
     const tasks = await Todo.find({ user: req.session.userId });
     res.render('index', { todoTasks: tasks });
 });
 
 app.post('/add', async (req, res) => {
-    if (!req.session.userId) return res.json({ error: 'Not logged in' });
-    try {
-        const user = await User.findById(req.session.userId);
-        const taskCount = await Todo.countDocuments({ user: req.session.userId });
-        
-        // CRITICAL: TRIGGER LIMIT IF TASKS >= 3
-        if (!user.isPremium && taskCount >= 3) {
-            return res.status(403).json({ error: 'limit_reached' });
-        }
-
-        const newTask = new Todo({ text: req.body.newtodo, user: req.session.userId });
-        await newTask.save();
-        res.json(newTask);
-    } catch (err) {
-        res.status(500).json({ error: 'Server Error' });
-    }
+    const user = await User.findById(req.session.userId);
+    const count = await Todo.countDocuments({ user: req.session.userId });
+    if (!user.isPremium && count >= 3) return res.status(403).json({ error: 'limit_reached' });
+    const task = new Todo({ text: req.body.newtodo, user: req.session.userId });
+    await task.save();
+    res.json(task);
 });
 
 app.post('/api/payment/order', async (req, res) => {
-    try {
-        const order = await razorpayInstance.orders.create({ amount: 49900, currency: 'INR', receipt: 'premium' });
-        res.json(order);
-    } catch (error) {
-        res.status(500).json({ error: 'Failed' });
-    }
+    const order = await razorpayInstance.orders.create({ amount: 49900, currency: 'INR', receipt: 'receipt#1' });
+    res.json(order);
 });
 
 app.post('/api/payment/success', async (req, res) => {
@@ -139,17 +89,9 @@ app.post('/api/payment/success', async (req, res) => {
     res.json({ success: true });
 });
 
-app.post('/delete', async (req, res) => {
-    await Todo.findByIdAndDelete(req.body.id);
-    res.json({ success: true });
-});
-
+app.post('/delete', async (req, res) => { await Todo.findByIdAndDelete(req.body.id); res.json({ success: true }); });
 app.post('/toggle/:id', async (req, res) => {
-    const task = await Todo.findById(req.params.id);
-    task.isCompleted = !task.isCompleted;
-    await task.save();
-    res.json({ success: true });
+    const t = await Todo.findById(req.params.id); t.isCompleted = !t.isCompleted; await t.save(); res.json({ success: true });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server Running on ${PORT}`));
+app.listen(process.env.PORT || 3000);
