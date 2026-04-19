@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const session = require('express-session');
 const Razorpay = require('razorpay');
 const nodemailer = require('nodemailer');
+const bcrypt = require('bcrypt'); // Added for Topic 9
 
 const app = express();
 
@@ -46,22 +47,60 @@ const Todo = mongoose.model('Todo', new mongoose.Schema({
 
 app.get('/', (req, res) => res.render('login'));
 app.get('/signup', (req, res) => res.render('signup'));
+
 app.post('/signup', async (req, res) => {
+    const { email, password } = req.body;
     const otp = Math.floor(1000 + Math.random() * 9000).toString();
-    req.session.tempUser = { email: req.body.email, password: req.body.password, otp };
-    await transporter.sendMail({ from: 'tanmaibattu@gmail.com', to: req.body.email, subject: 'OTP', text: `OTP: ${otp}` });
+    
+    // Topic 9: Hash the password BEFORE storing it in session
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    req.session.tempUser = { email, password: hashedPassword, otp };
+    
+    await transporter.sendMail({ 
+        from: 'tanmaibattu@gmail.com', 
+        to: email, 
+        subject: 'My Focus OTP', 
+        text: `Your OTP is: ${otp}` 
+    });
     res.redirect('/verify');
 });
-app.get('/verify', (req, res) => res.render('verify', { email: req.session.tempUser.email }));
-app.post('/verify', async (req, res) => {
-    const user = new User({ email: req.session.tempUser.email, password: req.session.tempUser.password });
-    await user.save();
-    req.session.userId = user._id;
-    res.redirect('/app');
+
+app.get('/verify', (req, res) => {
+    if(!req.session.tempUser) return res.redirect('/signup');
+    res.render('verify', { email: req.session.tempUser.email });
 });
+
+// STRICT OTP VERIFICATION LOGIC
+app.post('/verify', async (req, res) => {
+    const { otp } = req.body;
+    const tempUser = req.session.tempUser;
+
+    if (tempUser && otp === tempUser.otp) {
+        const newUser = new User({ 
+            email: tempUser.email, 
+            password: tempUser.password // This is already hashed from signup
+        });
+        await newUser.save();
+        req.session.userId = newUser._id;
+        req.session.tempUser = null;
+        res.redirect('/app');
+    } else {
+        res.send("Invalid OTP. <a href='/signup'>Try again</a>");
+    }
+});
+
 app.post('/login', async (req, res) => {
-    const user = await User.findOne({ email: req.body.email });
-    if (user && user.password === req.body.password) { req.session.userId = user._id; res.redirect('/app'); }
+    const { email, password } = req.body;
+    const user = await User.findOne({ email });
+    
+    // Topic 9: Compare hashed password
+    if (user && await bcrypt.compare(password, user.password)) {
+        req.session.userId = user._id;
+        res.redirect('/app');
+    } else {
+        res.send("Invalid credentials.");
+    }
 });
 
 app.get('/app', async (req, res) => {
@@ -74,7 +113,7 @@ app.get('/app', async (req, res) => {
 app.post('/add', async (req, res) => {
     const user = await User.findById(req.session.userId);
     const count = await Todo.countDocuments({ user: req.session.userId });
-    if (!user.isPremium && count >= 3) return res.json({ error: 'limit' });
+    if (!user.isPremium && count >= 3) return res.json({ trigger_payment: true });
     const task = new Todo({ text: req.body.newtodo, user: req.session.userId });
     await task.save();
     res.json({ success: true });
