@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify My Focus</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
+        body {
+            background: url('https://images.unsplash.com/photo-1519681393784-d120267933ba?q=80&w=2070&auto=format&fit=crop') no-repeat center center/cover;
+            height: 100vh; display: flex; justify-content: center; align-items: center;
+        }
+        body::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.4); z-index: -1; }
+        .auth-container {
+            background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(20px);
+            padding: 40px; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white; text-align: center; width: 350px;
+        }
+        h2 { font-weight: 300; margin-bottom: 10px; }
+        input { width: 100%; padding: 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); color: white; text-align: center; font-size: 20px; margin-bottom: 20px; }
+        button { width: 100%; padding: 15px; border-radius: 10px; border: none; background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%); color: white; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <h2>Verify Identity</h2>
+        <p style="margin-bottom: 20px; font-size: 14px;">OTP sent to: <%= email %></p>
+        <form action="/verify" method="POST">
+            <input type="text" name="otp" placeholder="Enter OTP" maxlength="4" required>
+            <button type="submit">Complete Setup</button>
+        </form>
+    </div>
+</body>
+</html>
