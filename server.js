@@ -20,7 +20,7 @@ const razorpayInstance = new Razorpay({
 });
 
 const mongoURI = "mongodb+srv://admin:Tannu%402006@cluster0.0cpngfx.mongodb.net/?appName=Cluster0";
-mongoose.connect(mongoURI).then(() => console.log("DB Connected"));
+mongoose.connect(mongoURI).then(() => console.log("MongoDB Connected Successfully"));
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
@@ -46,26 +46,40 @@ const Todo = mongoose.model('Todo', new mongoose.Schema({
 
 app.get('/', (req, res) => res.render('login'));
 app.get('/signup', (req, res) => res.render('signup'));
+
 app.post('/signup', async (req, res) => {
-    const { email, password } = req.body;
     const otp = Math.floor(1000 + Math.random() * 9000).toString();
-    req.session.tempUser = { email, password, otp };
-    await transporter.sendMail({ from: 'tanmaibattu@gmail.com', to: email, subject: 'OTP', text: `OTP: ${otp}` });
+    req.session.tempUser = { email: req.body.email, password: req.body.password, otp };
+    await transporter.sendMail({
+        from: 'tanmaibattu@gmail.com',
+        to: req.body.email,
+        subject: 'My Focus OTP',
+        text: `Your OTP is: ${otp}`
+    });
     res.redirect('/verify');
 });
+
 app.get('/verify', (req, res) => res.render('verify', { email: req.session.tempUser.email }));
+
 app.post('/verify', async (req, res) => {
     const newUser = new User({ email: req.session.tempUser.email, password: req.session.tempUser.password });
     await newUser.save();
     req.session.userId = newUser._id;
     res.redirect('/app');
 });
+
 app.post('/login', async (req, res) => {
     const user = await User.findOne({ email: req.body.email });
-    if (user && user.password === req.body.password) { req.session.userId = user._id; res.redirect('/app'); }
+    if (user && user.password === req.body.password) {
+        req.session.userId = user._id;
+        res.redirect('/app');
+    } else {
+        res.send("Invalid credentials.");
+    }
 });
 
 app.get('/app', async (req, res) => {
+    if (!req.session.userId) return res.redirect('/');
     const tasks = await Todo.find({ user: req.session.userId });
     res.render('index', { todoTasks: tasks });
 });
@@ -73,14 +87,18 @@ app.get('/app', async (req, res) => {
 app.post('/add', async (req, res) => {
     const user = await User.findById(req.session.userId);
     const count = await Todo.countDocuments({ user: req.session.userId });
-    if (!user.isPremium && count >= 3) return res.status(403).json({ error: 'limit_reached' });
+    
+    if (!user.isPremium && count >= 3) {
+        return res.status(403).json({ error: 'limit_reached' });
+    }
+
     const task = new Todo({ text: req.body.newtodo, user: req.session.userId });
     await task.save();
     res.json(task);
 });
 
 app.post('/api/payment/order', async (req, res) => {
-    const order = await razorpayInstance.orders.create({ amount: 49900, currency: 'INR', receipt: 'receipt#1' });
+    const order = await razorpayInstance.orders.create({ amount: 49900, currency: 'INR', receipt: 'r1' });
     res.json(order);
 });
 
@@ -89,9 +107,17 @@ app.post('/api/payment/success', async (req, res) => {
     res.json({ success: true });
 });
 
-app.post('/delete', async (req, res) => { await Todo.findByIdAndDelete(req.body.id); res.json({ success: true }); });
-app.post('/toggle/:id', async (req, res) => {
-    const t = await Todo.findById(req.params.id); t.isCompleted = !t.isCompleted; await t.save(); res.json({ success: true });
+app.post('/delete', async (req, res) => {
+    await Todo.findByIdAndDelete(req.body.id);
+    res.json({ success: true });
 });
 
-app.listen(process.env.PORT || 3000);
+app.post('/toggle/:id', async (req, res) => {
+    const t = await Todo.findById(req.params.id);
+    t.isCompleted = !t.isCompleted;
+    await t.save();
+    res.json({ success: true });
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Running on ${PORT}`));
