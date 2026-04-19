@@ -11,7 +11,7 @@ const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
         user: 'tanmaibattu@gmail.com', 
-        pass: 'tvcd wyhl opzi gxfm' // Your generated App Password
+        pass: 'tvcd wyhl opzi gxfm' 
     }
 });
 
@@ -48,12 +48,12 @@ const User = mongoose.model('User', userSchema);
 
 const todoSchema = new mongoose.Schema({
     text: String,
-    isCompleted: Boolean,
+    isCompleted: { type: Boolean, default: false },
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 });
 const Todo = mongoose.model('Todo', todoSchema);
 
-// --- 6. AUTH ROUTES (OTP Logic) ---
+// --- 6. AUTH ROUTES ---
 
 app.get('/', (req, res) => res.render('login'));
 app.get('/signup', (req, res) => res.render('signup'));
@@ -64,7 +64,6 @@ app.post('/signup', async (req, res) => {
         const existingUser = await User.findOne({ email });
         if (existingUser) return res.send("User exists. <a href='/'>Login</a>");
 
-        // Generate 4-digit OTP
         const otp = Math.floor(1000 + Math.random() * 9000).toString();
         req.session.tempUser = { email, password, otp };
 
@@ -77,8 +76,7 @@ app.post('/signup', async (req, res) => {
 
         res.redirect('/verify');
     } catch (err) {
-        console.error("Signup Error:", err);
-        res.send("Error in signup flow. Please try again.");
+        res.send("Error in signup flow.");
     }
 });
 
@@ -112,7 +110,7 @@ app.post('/login', async (req, res) => {
     }
 });
 
-// --- 7. APP & PAYMENT ROUTES ---
+// --- 7. APP & PAYMENT ROUTES (The Limit Logic) ---
 
 app.get('/app', async (req, res) => {
     if (!req.session.userId) return res.redirect('/');
@@ -122,60 +120,56 @@ app.get('/app', async (req, res) => {
 
 app.post('/add', async (req, res) => {
     if (!req.session.userId) return res.json({ error: 'Not logged in' });
+    
     try {
         const user = await User.findById(req.session.userId);
         const taskCount = await Todo.countDocuments({ user: req.session.userId });
 
-        if (!user.isPremium && taskCount >= 3) return res.json({ error: 'limit_reached' });
+        // THE 3-TASK LIMIT CHECK
+        if (!user.isPremium && taskCount >= 3) {
+            return res.json({ error: 'limit_reached' });
+        }
 
-        const newTask = new Todo({ text: req.body.newtodo, isCompleted: false, user: req.session.userId });
+        const newTask = new Todo({ 
+            text: req.body.newtodo, 
+            isCompleted: false, 
+            user: req.session.userId 
+        });
         await newTask.save();
         res.json(newTask);
     } catch (err) {
-        res.status(500).json({ error: 'Internal Server Error' });
+        res.status(500).json({ error: 'Server Error' });
     }
 });
 
-// GENERATE RAZORPAY ORDER
 app.post('/api/payment/order', async (req, res) => {
     try {
-        const options = { 
-            amount: 49900, // ₹499.00
-            currency: 'INR', 
-            receipt: 'premium_upgrade' 
-        };
+        const options = { amount: 49900, currency: 'INR', receipt: 'premium' };
         const order = await razorpayInstance.orders.create(options);
         res.json(order);
     } catch (error) {
-        // This will print the exact reason to your terminal if the order fails
         console.error("RAZORPAY ERROR:", error);
         res.status(500).json({ error: 'Payment failed to initiate' });
     }
 });
 
-// HANDLE PAYMENT SUCCESS
 app.post('/api/payment/success', async (req, res) => {
-    try {
-        await User.findByIdAndUpdate(req.session.userId, { isPremium: true });
-        res.json({ success: true });
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to update user status' });
-    }
+    await User.findByIdAndUpdate(req.session.userId, { isPremium: true });
+    res.json({ success: true });
 });
 
-// DELETE TASK
 app.post('/delete', async (req, res) => {
     await Todo.findByIdAndDelete(req.body.id);
     res.json({ success: true });
 });
 
-// TOGGLE TASK
 app.post('/toggle/:id', async (req, res) => {
-    const taskId = req.params.id;
-    const task = await Todo.findById(taskId);
+    const task = await Todo.findById(req.params.id);
     task.isCompleted = !task.isCompleted;
     await task.save();
     res.json({ success: true });
 });
 
-app.listen(3000, () => console.log("Server running on port 3000"));
+// --- DYNAMIC PORT BINDING FOR RENDER ---
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
