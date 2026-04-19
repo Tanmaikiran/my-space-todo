@@ -6,28 +6,24 @@ const nodemailer = require('nodemailer');
 
 const app = express();
 
-// --- 1. EMAIL SETUP ---
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
-        user: 'tanmaibattu@gmail.com', 
-        pass: 'tvcd wyhl opzi gxfm' 
+        user: 'tanmaibattu@gmail.com',
+        pass: 'tvcd wyhl opzi gxfm'
     }
 });
 
-// --- 2. RAZORPAY SETUP ---
 const razorpayInstance = new Razorpay({
-    key_id: 'rzp_test_SfFpmxjEKf5E9Z', 
+    key_id: 'rzp_test_SfFpmxjEKf5E9Z',
     key_secret: 'f3wn0IxnE1TGGq4i3WNsTU1A'
 });
 
-// --- 3. DATABASE CONNECTION ---
 const mongoURI = "mongodb+srv://admin:Tannu%402006@cluster0.0cpngfx.mongodb.net/?appName=Cluster0";
 mongoose.connect(mongoURI)
     .then(() => console.log("MongoDB Connected Successfully"))
-    .catch(err => console.error("MongoDB Connection Error:", err));
+    .catch(err => console.error(err));
 
-// --- 4. MIDDLEWARE ---
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static('public'));
@@ -38,7 +34,6 @@ app.use(session({
     saveUninitialized: true
 }));
 
-// --- 5. DATABASE MODELS ---
 const userSchema = new mongoose.Schema({
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
@@ -53,8 +48,6 @@ const todoSchema = new mongoose.Schema({
 });
 const Todo = mongoose.model('Todo', todoSchema);
 
-// --- 6. AUTH ROUTES ---
-
 app.get('/', (req, res) => res.render('login'));
 app.get('/signup', (req, res) => res.render('signup'));
 
@@ -63,20 +56,17 @@ app.post('/signup', async (req, res) => {
     try {
         const existingUser = await User.findOne({ email });
         if (existingUser) return res.send("User exists. <a href='/'>Login</a>");
-
         const otp = Math.floor(1000 + Math.random() * 9000).toString();
         req.session.tempUser = { email, password, otp };
-
         await transporter.sendMail({
             from: 'tanmaibattu@gmail.com',
             to: email,
-            subject: 'My Focus - Verification Code',
-            text: `Your OTP for 2-Step Verification is: ${otp}`
+            subject: 'Verification Code',
+            text: `Your OTP is: ${otp}`
         });
-
         res.redirect('/verify');
     } catch (err) {
-        res.send("Error in signup flow.");
+        res.send("Signup Error.");
     }
 });
 
@@ -95,7 +85,7 @@ app.post('/verify', async (req, res) => {
         req.session.tempUser = null;
         res.redirect('/app');
     } else {
-        res.send("Invalid OTP. <a href='/verify'>Try again</a>");
+        res.send("Invalid OTP.");
     }
 });
 
@@ -106,11 +96,9 @@ app.post('/login', async (req, res) => {
         req.session.userId = foundUser._id;
         res.redirect('/app');
     } else {
-        res.send("Invalid credentials. <a href='/'>Try Again</a>");
+        res.send("Invalid credentials.");
     }
 });
-
-// --- 7. APP & PAYMENT ROUTES (The Limit Logic) ---
 
 app.get('/app', async (req, res) => {
     if (!req.session.userId) return res.redirect('/');
@@ -120,36 +108,26 @@ app.get('/app', async (req, res) => {
 
 app.post('/add', async (req, res) => {
     if (!req.session.userId) return res.json({ error: 'Not logged in' });
-    
     try {
         const user = await User.findById(req.session.userId);
         const taskCount = await Todo.countDocuments({ user: req.session.userId });
-
-        // THE 3-TASK LIMIT CHECK
         if (!user.isPremium && taskCount >= 3) {
             return res.json({ error: 'limit_reached' });
         }
-
-        const newTask = new Todo({ 
-            text: req.body.newtodo, 
-            isCompleted: false, 
-            user: req.session.userId 
-        });
+        const newTask = new Todo({ text: req.body.newtodo, user: req.session.userId });
         await newTask.save();
         res.json(newTask);
     } catch (err) {
-        res.status(500).json({ error: 'Server Error' });
+        res.status(500).json({ error: 'Error' });
     }
 });
 
 app.post('/api/payment/order', async (req, res) => {
     try {
-        const options = { amount: 49900, currency: 'INR', receipt: 'premium' };
-        const order = await razorpayInstance.orders.create(options);
+        const order = await razorpayInstance.orders.create({ amount: 49900, currency: 'INR', receipt: 'premium' });
         res.json(order);
     } catch (error) {
-        console.error("RAZORPAY ERROR:", error);
-        res.status(500).json({ error: 'Payment failed to initiate' });
+        res.status(500).json({ error: 'Failed' });
     }
 });
 
@@ -170,6 +148,5 @@ app.post('/toggle/:id', async (req, res) => {
     res.json({ success: true });
 });
 
-// --- DYNAMIC PORT BINDING FOR RENDER ---
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Running on ${PORT}`));
