@@ -21,7 +21,7 @@ const razorpayInstance = new Razorpay({
 
 const mongoURI = "mongodb+srv://admin:Tannu%402006@cluster0.0cpngfx.mongodb.net/?appName=Cluster0";
 mongoose.connect(mongoURI)
-    .then(() => console.log("MongoDB Connected Successfully"))
+    .then(() => console.log("MongoDB Connected"))
     .catch(err => console.error(err));
 
 app.use(express.urlencoded({ extended: true }));
@@ -111,14 +111,17 @@ app.post('/add', async (req, res) => {
     try {
         const user = await User.findById(req.session.userId);
         const taskCount = await Todo.countDocuments({ user: req.session.userId });
+        
+        // CRITICAL: TRIGGER LIMIT IF TASKS >= 3
         if (!user.isPremium && taskCount >= 3) {
-            return res.json({ error: 'limit_reached' });
+            return res.status(403).json({ error: 'limit_reached' });
         }
+
         const newTask = new Todo({ text: req.body.newtodo, user: req.session.userId });
         await newTask.save();
         res.json(newTask);
     } catch (err) {
-        res.status(500).json({ error: 'Error' });
+        res.status(500).json({ error: 'Server Error' });
     }
 });
 
@@ -149,4 +152,4 @@ app.post('/toggle/:id', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Running on ${PORT}`));
+app.listen(PORT, () => console.log(`Server Running on ${PORT}`));

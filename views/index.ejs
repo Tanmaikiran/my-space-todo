@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Space</title>
+    <title>My Space | Focus</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
@@ -29,7 +29,7 @@
         .task-list { list-style: none; }
         .task-item {
             display: flex; align-items: center; justify-content: space-between;
-            background: rgba(0, 0, 0, 0.2); padding: 15px 20px; border-radius: 20px; margin-bottom: 12px;
+            background: rgba(0, 0, 0, 0.2); padding: 15px 20px; border-radius: 20px; margin-bottom: 12px; transition: 0.3s;
         }
         .task-content { display: flex; align-items: center; gap: 15px; flex-grow: 1; }
         .completed .task-text { text-decoration: line-through; opacity: 0.5; }
@@ -42,7 +42,7 @@
     <div class="app-container">
         <h2>My Space</h2>
         <div class="input-group">
-            <input type="text" id="todoInput" placeholder="Add task..." autocomplete="off">
+            <input type="text" id="todoInput" placeholder="Add task...">
             <button onclick="addTask()" class="add-btn"><i class="fas fa-plus"></i></button>
         </div>
         <ul class="task-list" id="taskList">
@@ -64,16 +64,18 @@
         async function addTask() {
             const input = document.getElementById('todoInput');
             if (!input.value) return;
+            
             const res = await fetch('/add', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ newtodo: input.value })
             });
-            const data = await res.json();
-            if (data.error === 'limit_reached') {
-                alert("Limit reached! Please upgrade to Premium.");
+            
+            if (res.status === 403) {
+                alert("Task Limit Reached! Pay to unlock unlimited space.");
                 return buyPremium();
             }
+            
             location.reload(); 
         }
 
@@ -82,17 +84,17 @@
             const check = li.querySelector('.custom-checkbox');
             li.classList.toggle('completed');
             check.innerHTML = li.classList.contains('completed') ? '<i class="fas fa-check"></i>' : '';
-            fetch(`/toggle/${id}`, { method: 'POST' }); // Async background call
+            fetch(`/toggle/${id}`, { method: 'POST' });
         }
 
         async function deleteTask(id) {
             const li = document.getElementById(`task-${id}`);
-            li.style.display = 'none'; // Instant visual hide
+            li.style.display = 'none';
             fetch('/delete', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id })
-            }); // Async background call
+            });
         }
 
         async function buyPremium() {
