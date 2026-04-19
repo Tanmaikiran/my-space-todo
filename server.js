@@ -19,8 +19,8 @@ const razorpayInstance = new Razorpay({
     key_secret: 'f3wn0IxnE1TGGq4i3WNsTU1A'
 });
 
-const mongoURI = "mongodb+srv://admin:Tannu%402006@cluster0.0cpngfx.mongodb.net/?appName=Cluster0";
-mongoose.connect(mongoURI).then(() => console.log("MongoDB Connected Successfully"));
+mongoose.connect("mongodb+srv://admin:Tannu%402006@cluster0.0cpngfx.mongodb.net/?appName=Cluster0")
+    .then(() => console.log("MongoDB Connected Successfully"));
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
@@ -46,36 +46,22 @@ const Todo = mongoose.model('Todo', new mongoose.Schema({
 
 app.get('/', (req, res) => res.render('login'));
 app.get('/signup', (req, res) => res.render('signup'));
-
 app.post('/signup', async (req, res) => {
     const otp = Math.floor(1000 + Math.random() * 9000).toString();
     req.session.tempUser = { email: req.body.email, password: req.body.password, otp };
-    await transporter.sendMail({
-        from: 'tanmaibattu@gmail.com',
-        to: req.body.email,
-        subject: 'My Focus OTP',
-        text: `Your OTP is: ${otp}`
-    });
+    await transporter.sendMail({ from: 'tanmaibattu@gmail.com', to: req.body.email, subject: 'My Focus OTP', text: `OTP: ${otp}` });
     res.redirect('/verify');
 });
-
 app.get('/verify', (req, res) => res.render('verify', { email: req.session.tempUser.email }));
-
 app.post('/verify', async (req, res) => {
-    const newUser = new User({ email: req.session.tempUser.email, password: req.session.tempUser.password });
-    await newUser.save();
-    req.session.userId = newUser._id;
+    const user = new User({ email: req.session.tempUser.email, password: req.session.tempUser.password });
+    await user.save();
+    req.session.userId = user._id;
     res.redirect('/app');
 });
-
 app.post('/login', async (req, res) => {
     const user = await User.findOne({ email: req.body.email });
-    if (user && user.password === req.body.password) {
-        req.session.userId = user._id;
-        res.redirect('/app');
-    } else {
-        res.send("Invalid credentials.");
-    }
+    if (user && user.password === req.body.password) { req.session.userId = user._id; res.redirect('/app'); }
 });
 
 app.get('/app', async (req, res) => {
@@ -87,14 +73,12 @@ app.get('/app', async (req, res) => {
 app.post('/add', async (req, res) => {
     const user = await User.findById(req.session.userId);
     const count = await Todo.countDocuments({ user: req.session.userId });
-    
     if (!user.isPremium && count >= 3) {
-        return res.status(403).json({ error: 'limit_reached' });
+        return res.json({ trigger_payment: true }); 
     }
-
     const task = new Todo({ text: req.body.newtodo, user: req.session.userId });
     await task.save();
-    res.json(task);
+    res.json({ success: true });
 });
 
 app.post('/api/payment/order', async (req, res) => {
@@ -107,17 +91,9 @@ app.post('/api/payment/success', async (req, res) => {
     res.json({ success: true });
 });
 
-app.post('/delete', async (req, res) => {
-    await Todo.findByIdAndDelete(req.body.id);
-    res.json({ success: true });
-});
-
+app.post('/delete', async (req, res) => { await Todo.findByIdAndDelete(req.body.id); res.json({ success: true }); });
 app.post('/toggle/:id', async (req, res) => {
-    const t = await Todo.findById(req.params.id);
-    t.isCompleted = !t.isCompleted;
-    await t.save();
-    res.json({ success: true });
+    const t = await Todo.findById(req.params.id); t.isCompleted = !t.isCompleted; await t.save(); res.json({ success: true });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Running on ${PORT}`));
+app.listen(process.env.PORT || 3000, () => console.log("Server Live"));
