@@ -28,7 +28,7 @@
             <input type="text" id="todoInput" placeholder="Add task...">
             <button onclick="addTask()" class="add-btn"><i class="fas fa-plus"></i></button>
         </div>
-        <ul class="task-list">
+        <ul class="task-list" id="taskList">
             <% todoTasks.forEach(task => { %>
                 <li class="task-item <%= task.isCompleted ? 'completed' : '' %>" id="task-<%= task._id %>">
                     <span style="display:flex; align-items:center; gap:15px;">
@@ -44,14 +44,25 @@
     </div>
 
     <script>
+        const isPremium = <%= isPremium %>;
+
         async function addTask() {
+            const list = document.getElementById('taskList');
             const val = document.getElementById('todoInput').value;
-            const res = await fetch('/add', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({newtodo: val}) });
-            const data = await res.json();
-            if (data.trigger_payment) {
-                alert("Limit Reached! Opening Payment...");
+            
+            // Hard Frontend Limit
+            if (!isPremium && list.children.length >= 3) {
+                alert("Limit Reached!");
                 return buyPremium();
             }
+
+            const res = await fetch('/add', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({newtodo: val}) 
+            });
+            const data = await res.json();
+            if (data.error === 'limit') return buyPremium();
             location.reload();
         }
 
