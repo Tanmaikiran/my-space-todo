@@ -1,137 +1,135 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const session = require('express-session');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const speakeasy = require('speakeasy');
+const QRCode = require('qrcode');
+const redis = require('redis');
 const Razorpay = require('razorpay');
-const nodemailer = require('nodemailer');
-const bcrypt = require('bcrypt'); // Added for Topic 9
+const path = require('path');
 
 const app = express();
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.set('view engine', 'ejs');
+app.use(express.static('public'));
 
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: 'tanmaibattu@gmail.com',
-        pass: 'tvcd wyhl opzi gxfm'
-    }
-});
+const JWT_SECRET = "super_secret_key_123";
+
+const redisClient = redis.createClient({ url: 'redis://127.0.0.1:6379' });
+let isRedisConnected = false;
+redisClient.on('error', () => { isRedisConnected = false; });
+redisClient.connect().then(() => { isRedisConnected = true; }).catch(() => {});
+
+const MONGO_URI = 'mongodb+srv://admin:Tannu2006@cluster0.0cpngfx.mongodb.net/enterprise_todo?retryWrites=true&w=majority';
+mongoose.connect(MONGO_URI)
+    .then(() => console.log('MongoDB Connected Successfully'))
+    .catch(err => console.log('MongoDB Error:', err));
 
 const razorpayInstance = new Razorpay({
-    key_id: 'rzp_test_SfFpmxjEKf5E9Z',
+    key_id: 'rzp_test_SfFpmxjEKf5E9Z', 
     key_secret: 'f3wn0IxnE1TGGq4i3WNsTU1A'
 });
 
-mongoose.connect("mongodb+srv://admin:Tannu%402006@cluster0.0cpngfx.mongodb.net/?appName=Cluster0")
-    .then(() => console.log("DB Connected"));
-
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
-app.use(express.static('public'));
-app.set('view engine', 'ejs');
-app.use(session({
-    secret: 'myfocus_secret_key',
-    resave: false,
-    saveUninitialized: true
-}));
-
-const User = mongoose.model('User', new mongoose.Schema({
-    email: { type: String, required: true, unique: true },
+const userSchema = new mongoose.Schema({
+    username: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    isPremium: { type: Boolean, default: false }
-}));
+    mfaSecret: String
+});
+const User = mongoose.model('User', userSchema);
 
-const Todo = mongoose.model('Todo', new mongoose.Schema({
+const todoSchema = new mongoose.Schema({
     text: String,
-    isCompleted: { type: Boolean, default: false },
-    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
-}));
-
-app.get('/', (req, res) => res.render('login'));
-app.get('/signup', (req, res) => res.render('signup'));
-
-app.post('/signup', async (req, res) => {
-    const { email, password } = req.body;
-    const otp = Math.floor(1000 + Math.random() * 9000).toString();
-    
-    // Topic 9: Hash the password BEFORE storing it in session
-    const hashedPassword = await bcrypt.hash(password, 10);
-    
-    req.session.tempUser = { email, password: hashedPassword, otp };
-    
-    await transporter.sendMail({ 
-        from: 'tanmaibattu@gmail.com', 
-        to: email, 
-        subject: 'My Focus OTP', 
-        text: `Your OTP is: ${otp}` 
-    });
-    res.redirect('/verify');
+    userId: String
 });
+const Todo = mongoose.model('Todo', todoSchema);
 
-app.get('/verify', (req, res) => {
-    if(!req.session.tempUser) return res.redirect('/signup');
-    res.render('verify', { email: req.session.tempUser.email });
-});
+const verifyJWT = (req, res, next) => {
+    const token = req.headers['authorization'];
+    if (!token) return res.status(403).json({ error: "Token required" });
+    try {
+        const decoded = jwt.verify(token.split(" ")[1], JWT_SECRET);
+        req.user = decoded;
+        next();
+    } catch (err) {
+        res.status(401).json({ error: "Invalid Token" });
+    }
+};
 
-// STRICT OTP VERIFICATION LOGIC
-app.post('/verify', async (req, res) => {
-    const { otp } = req.body;
-    const tempUser = req.session.tempUser;
+app.get('/', (req, res) => res.render('index'));
 
-    if (tempUser && otp === tempUser.otp) {
-        const newUser = new User({ 
-            email: tempUser.email, 
-            password: tempUser.password // This is already hashed from signup
+app.post('/register', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const secret = speakeasy.generateSecret({ name: "Workspace-Tanmai" });
+        
+        await User.findOneAndUpdate(
+            { username: username },
+            { password: hashedPassword, mfaSecret: secret.base32 },
+            { upsert: true, new: true }
+        );
+
+        QRCode.toDataURL(secret.otpauth_url, (err, data_url) => {
+            res.json({ message: "Success", qrCode: data_url });
         });
-        await newUser.save();
-        req.session.userId = newUser._id;
-        req.session.tempUser = null;
-        res.redirect('/app');
-    } else {
-        res.send("Invalid OTP. <a href='/signup'>Try again</a>");
+    } catch (error) {
+        res.status(500).json({ error: "Server error" });
     }
 });
 
 app.post('/login', async (req, res) => {
-    const { email, password } = req.body;
-    const user = await User.findOne({ email });
+    const { username, password, mfaToken } = req.body;
+    const user = await User.findOne({ username });
     
-    // Topic 9: Compare hashed password
-    if (user && await bcrypt.compare(password, user.password)) {
-        req.session.userId = user._id;
-        res.redirect('/app');
-    } else {
-        res.send("Invalid credentials.");
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+        return res.status(400).json({ error: "Invalid Email or Password" });
+    }
+
+    const verified = speakeasy.totp.verify({
+        secret: user.mfaSecret,
+        encoding: 'base32',
+        token: mfaToken
+    });
+
+    if (!verified) return res.status(400).json({ error: "Invalid 6-Digit MFA Code" });
+
+    const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '2h' });
+    res.json({ token });
+});
+
+app.get('/todos', verifyJWT, async (req, res) => {
+    const cacheKey = `todos_${req.user.userId}`;
+    if (isRedisConnected) {
+        const cached = await redisClient.get(cacheKey);
+        if (cached) return res.json(JSON.parse(cached));
+    }
+    const todos = await Todo.find({ userId: req.user.userId });
+    if (isRedisConnected) await redisClient.setEx(cacheKey, 3600, JSON.stringify(todos));
+    res.json(todos);
+});
+
+app.post('/todos', verifyJWT, async (req, res) => {
+    const todo = new Todo({ text: req.body.text, userId: req.user.userId });
+    await todo.save();
+    if (isRedisConnected) await redisClient.del(`todos_${req.user.userId}`);
+    res.json(todo);
+});
+
+app.delete('/todos/:id', verifyJWT, async (req, res) => {
+    await Todo.findByIdAndDelete(req.params.id);
+    if (isRedisConnected) await redisClient.del(`todos_${req.user.userId}`);
+    res.json({ success: true });
+});
+
+app.post('/api/payment/order', verifyJWT, async (req, res) => {
+    try {
+        const options = { amount: 49900, currency: 'INR', receipt: 'premium_upgrade_1' };
+        const order = await razorpayInstance.orders.create(options);
+        res.json(order);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to create payment order' });
     }
 });
 
-app.get('/app', async (req, res) => {
-    if (!req.session.userId) return res.redirect('/');
-    const user = await User.findById(req.session.userId);
-    const tasks = await Todo.find({ user: req.session.userId });
-    res.render('index', { todoTasks: tasks, isPremium: user.isPremium });
-});
-
-app.post('/add', async (req, res) => {
-    const user = await User.findById(req.session.userId);
-    const count = await Todo.countDocuments({ user: req.session.userId });
-    if (!user.isPremium && count >= 3) return res.json({ trigger_payment: true });
-    const task = new Todo({ text: req.body.newtodo, user: req.session.userId });
-    await task.save();
-    res.json({ success: true });
-});
-
-app.post('/api/payment/order', async (req, res) => {
-    const order = await razorpayInstance.orders.create({ amount: 49900, currency: 'INR', receipt: 'r1' });
-    res.json(order);
-});
-
-app.post('/api/payment/success', async (req, res) => {
-    await User.findByIdAndUpdate(req.session.userId, { isPremium: true });
-    res.json({ success: true });
-});
-
-app.post('/delete', async (req, res) => { await Todo.findByIdAndDelete(req.body.id); res.json({ success: true }); });
-app.post('/toggle/:id', async (req, res) => {
-    const t = await Todo.findById(req.params.id); t.isCompleted = !t.isCompleted; await t.save(); res.json({ success: true });
-});
-
-app.listen(process.env.PORT || 3000);
+app.listen(3000, () => console.log('Server running on port 3000'));

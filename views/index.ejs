@@ -3,86 +3,223 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Space</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <title>Enterprise Workspace - Battu Tanmai Kiran</title>
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
-        body { background: url('https://images.unsplash.com/photo-1519681393784-d120267933ba?q=80&w=2070&auto=format&fit=crop') no-repeat center center/cover; min-height: 100vh; display: flex; justify-content: center; padding-top: 80px; }
-        body::before { content: ''; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.4); z-index: -1; }
-        .app-container { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(30px); width: 90%; max-width: 500px; border-radius: 40px; padding: 40px; box-shadow: 0 25px 50px rgba(0,0,0,0.3); border: 1px solid rgba(255, 255, 255, 0.2); color: white; }
-        .input-group { display: flex; background: rgba(255, 255, 255, 0.15); border-radius: 50px; padding: 8px; border: 1px solid rgba(255, 255, 255, 0.3); margin-bottom: 30px; }
-        input { flex-grow: 1; padding: 12px 20px; border: none; background: transparent; color: white; outline: none; }
-        .add-btn { background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%); border: none; width: 45px; height: 45px; border-radius: 50%; color: white; cursor: pointer; }
-        .task-item { display: flex; align-items: center; justify-content: space-between; background: rgba(0, 0, 0, 0.2); padding: 15px 20px; border-radius: 20px; margin-bottom: 12px; }
-        .completed .task-text { text-decoration: line-through; opacity: 0.5; }
-        .custom-checkbox { width: 22px; height: 22px; border: 2px solid rgba(255, 255, 255, 0.4); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-        .completed .custom-checkbox { background: white; color: black; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, sans-serif; 
+            background: #0f172a url('https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1920&q=80') center/cover fixed;
+            color: white;
+            display: flex; justify-content: center; align-items: center;
+            min-height: 100vh; margin: 0;
+        }
+        .glass-card { 
+            background: rgba(15, 23, 42, 0.6); 
+            backdrop-filter: blur(12px); 
+            -webkit-backdrop-filter: blur(12px);
+            padding: 40px; border-radius: 20px; 
+            width: 100%; max-width: 380px; text-align: center;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        /* The Slider Bar UI */
+        .toggle-box {
+            display: flex;
+            background: rgba(255,255,255,0.1);
+            border-radius: 25px;
+            margin-bottom: 25px;
+            padding: 4px;
+        }
+        .toggle-btn {
+            flex: 1; padding: 10px; border: none; background: transparent; 
+            color: rgba(255,255,255,0.7); cursor: pointer; border-radius: 20px; 
+            transition: 0.3s; font-size: 14px; font-weight: bold;
+        }
+        .toggle-btn.active {
+            background: #3399cc; color: white; box-shadow: 0 2px 10px rgba(51,153,204,0.4);
+        }
+
+        h2 { margin-top: 0; font-weight: 600; font-size: 26px; }
+        input { 
+            width: 100%; padding: 14px; margin: 8px 0; 
+            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); 
+            border-radius: 10px; color: white; box-sizing: border-box;
+            font-size: 14px;
+        }
+        input::placeholder { color: rgba(255,255,255,0.6); }
+        input:focus { outline: none; background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.5); }
+        
+        .btn-main { 
+            width: 100%; padding: 14px; background: white; color: #0f172a; 
+            border: none; border-radius: 10px; cursor: pointer; font-weight: bold; 
+            margin-top: 15px; font-size: 15px; transition: 0.2s;
+        }
+        .btn-main:hover { background: #e0e0e0; transform: translateY(-2px); }
+        .hidden { display: none; }
+        
+        .todo-item { display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); text-align: left; align-items: center;}
+        .del-btn { background: rgba(255,77,77,0.2); color: #ff4d4d; border: 1px solid #ff4d4d; padding: 6px 12px; border-radius: 15px; cursor: pointer; font-size: 12px;}
+        .premium-btn { background: #3399cc; color: white; border: none; padding: 14px; border-radius: 10px; width: 100%; cursor: pointer; margin-top: 25px; font-weight: bold; font-size: 15px; box-shadow: 0 4px 15px rgba(51,153,204,0.4); }
     </style>
 </head>
 <body>
-    <div class="app-container">
-        <h2>My Space</h2>
-        <div class="input-group">
-            <input type="text" id="todoInput" placeholder="Add task...">
-            <button onclick="addTask()" class="add-btn"><i class="fas fa-plus"></i></button>
+    <div class="glass-card">
+        
+        <div id="auth-ui">
+            <h2>Workspace Auth</h2>
+            
+            <div class="toggle-box">
+                <button id="tab-login" class="toggle-btn active" onclick="switchTab('login')">Login</button>
+                <button id="tab-qr" class="toggle-btn" onclick="switchTab('qr')">Get QR Code</button>
+            </div>
+            
+            <input type="text" id="user" placeholder="Email Address">
+            <input type="password" id="pass" placeholder="Password">
+            
+            <div id="login-section">
+                <input type="text" id="mfa" placeholder="6-Digit Code (From App)">
+                <button class="btn-main" onclick="login()">Access Workspace</button>
+            </div>
+
+            <div id="qr-section" class="hidden">
+                <button class="btn-main" onclick="register()" style="background: #3399cc; color: white;">Generate QR Code</button>
+                
+                <div id="qr-container" class="hidden" style="margin-top: 20px;">
+                    <div style="background: white; padding: 10px; border-radius: 10px; display: inline-block;">
+                        <img id="qr-image" src="" style="width:160px; display: block;">
+                    </div>
+                    <p style="margin-top: 10px; font-size: 13px; font-weight: bold;">1. Scan in Google Authenticator<br>2. Switch to 'Login' tab to enter code</p>
+                </div>
+            </div>
         </div>
-        <ul class="task-list" id="taskList">
-            <% todoTasks.forEach(task => { %>
-                <li class="task-item <%= task.isCompleted ? 'completed' : '' %>" id="task-<%= task._id %>">
-                    <span style="display:flex; align-items:center; gap:15px;">
-                        <div class="custom-checkbox" onclick="toggleTask('<%= task._id %>')">
-                            <% if(task.isCompleted) { %> <i class="fas fa-check"></i> <% } %>
-                        </div>
-                        <span class="task-text"><%= task.text %></span>
-                    </span>
-                    <button onclick="deleteTask('<%= task._id %>')" style="background:none; border:none; color:#ff6b6b; cursor:pointer;"><i class="fas fa-trash"></i></button>
-                </li>
-            <% }) %>
-        </ul>
+
+        <div id="app-ui" class="hidden">
+            <h2>My Tasks</h2>
+            <input type="text" id="task" placeholder="Add a new task...">
+            <button class="btn-main" onclick="addTask()">Add Task</button>
+            
+            <div id="list" style="margin-top: 20px; max-height: 200px; overflow-y: auto;"></div>
+            
+            <button class="premium-btn" onclick="buyPremium()">Buy Premium Now (₹499)</button>
+            <div onclick="logout()" style="margin-top: 20px; cursor: pointer; font-size: 13px; color: rgba(255,255,255,0.7);">Logout</div>
+        </div>
     </div>
 
     <script>
-        const isPremium = <%= isPremium %>;
+        let token = localStorage.getItem('token');
+        if (token) showApp();
 
-        async function addTask() {
-            const list = document.getElementById('taskList');
-            const val = document.getElementById('todoInput').value;
+        // Slide Bar Logic
+        function switchTab(tab) {
+            document.getElementById('mfa').value = '';
+            document.getElementById('qr-container').classList.add('hidden');
             
-            // Hard Frontend Limit
-            if (!isPremium && list.children.length >= 3) {
-                alert("Limit Reached!");
-                return buyPremium();
+            if (tab === 'login') {
+                document.getElementById('tab-login').classList.add('active');
+                document.getElementById('tab-qr').classList.remove('active');
+                document.getElementById('login-section').classList.remove('hidden');
+                document.getElementById('qr-section').classList.add('hidden');
+            } else {
+                document.getElementById('tab-qr').classList.add('active');
+                document.getElementById('tab-login').classList.remove('active');
+                document.getElementById('qr-section').classList.remove('hidden');
+                document.getElementById('login-section').classList.add('hidden');
             }
+        }
 
-            const res = await fetch('/add', { 
-                method: 'POST', 
-                headers: {'Content-Type': 'application/json'}, 
-                body: JSON.stringify({newtodo: val}) 
+        async function register() {
+            if(!user.value || !pass.value) return alert("Enter email and password first.");
+
+            const res = await fetch('/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: user.value, password: pass.value })
             });
             const data = await res.json();
-            if (data.error === 'limit') return buyPremium();
-            location.reload();
+            
+            if (data.qrCode) {
+                document.getElementById('qr-container').classList.remove('hidden');
+                document.getElementById('qr-image').src = data.qrCode;
+            } else {
+                alert("Error generating QR.");
+            }
+        }
+
+        async function login() {
+            if(!user.value || !pass.value || !mfa.value) return alert("Please fill in Email, Password, and the 6-Digit Code.");
+
+            const res = await fetch('/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: user.value, password: pass.value, mfaToken: mfa.value })
+            });
+            const data = await res.json();
+            if (data.token) {
+                localStorage.setItem('token', data.token);
+                token = data.token;
+                showApp();
+            } else { 
+                alert(data.error || "Login Failed"); 
+            }
+        }
+
+        async function showApp() {
+            document.getElementById('auth-ui').classList.add('hidden');
+            document.getElementById('app-ui').classList.remove('hidden');
+            const res = await fetch('/todos', { headers: { 'Authorization': `Bearer ${token}` }});
+            const todos = await res.json();
+            const listDiv = document.getElementById('list');
+            listDiv.innerHTML = '';
+            todos.forEach(t => {
+                listDiv.innerHTML += `<div class="todo-item"><span>${t.text}</span><button class="del-btn" onclick="delTask('${t._id}')">Remove</button></div>`;
+            });
+        }
+
+        async function addTask() {
+            if(!task.value) return;
+            await fetch('/todos', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ text: task.value })
+            });
+            task.value = '';
+            showApp();
+        }
+
+        async function delTask(id) {
+            await fetch(`/todos/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }});
+            showApp();
         }
 
         async function buyPremium() {
-            const res = await fetch('/api/payment/order', { method: 'POST' });
-            const order = await res.json();
-            const options = {
-                "key": "rzp_test_SfFpmxjEKf5E9Z",
-                "amount": order.amount,
-                "order_id": order.id,
-                "handler": async function() {
-                    await fetch('/api/payment/success', { method: 'POST' });
-                    location.reload();
-                }
-            };
-            new Razorpay(options).open();
+            try {
+                const response = await fetch('/api/payment/order', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+                });
+                const orderData = await response.json();
+
+                const options = {
+                    "key": "rzp_test_SfFpmxjEKf5E9Z", 
+                    "amount": orderData.amount,
+                    "currency": "INR",
+                    "name": "My Workspace",
+                    "description": "Premium Upgrade",
+                    "order_id": orderData.id, 
+                    "handler": function (response){
+                        alert("Payment Successful! Welcome to Premium.");
+                    },
+                    "theme": { "color": "#3399cc" }
+                };
+                const rzp1 = new Razorpay(options);
+                rzp1.open();
+            } catch (error) {
+                alert("Payment initiation failed.");
+            }
         }
 
-        async function toggleTask(id) { await fetch(`/toggle/${id}`, { method: 'POST' }); location.reload(); }
-        async function deleteTask(id) { await fetch('/delete', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id}) }); location.reload(); }
+        function logout() { localStorage.removeItem('token'); location.reload(); }
     </script>
 </body>
 </html>
